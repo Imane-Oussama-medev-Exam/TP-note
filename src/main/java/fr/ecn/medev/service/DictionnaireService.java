@@ -5,7 +5,8 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
+import java.security.SecureRandom;
+
 
 /**
  * Service de gestion du dictionnaire de mots pour le jeu du pendu
@@ -13,16 +14,16 @@ import java.util.Random;
  * @version 1.0
  */
 public class DictionnaireService {
-    
+
     private final List<String> mots;
-    private final Random random;
-    
+    private final SecureRandom random;
+
     /**
      * Constructeur du service de dictionnaire
      */
     public DictionnaireService() {
         this.mots = new ArrayList<>();
-        this.random = new Random();
+        this.random = new SecureRandom();
     }
     
     /**
