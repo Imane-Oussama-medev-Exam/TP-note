@@ -18,7 +18,7 @@
         <junit.version>5.10.1</junit.version>
 
         <!-- Configuration SonarCloud -->
-        <sonar.organization>medev-practice</sonar.organization>
+        <sonar.organization>Imane-Oussama-medev-Exam</sonar.organization>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
     </properties>
 
