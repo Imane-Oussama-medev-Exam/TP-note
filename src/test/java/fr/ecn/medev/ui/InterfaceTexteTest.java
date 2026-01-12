@@ -1,22 +1,30 @@
 package fr.ecn.medev.ui;
 
-import fr.ecn.medev.model.EtatPartie;
 import fr.ecn.medev.service.DictionnaireService;
 import fr.ecn.medev.service.GestionnairePartie;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.AfterEach;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests pour InterfaceTexte (validation logique sans IO)
+ * Tests pour InterfaceTexte avec simulation IO
  * @author Oussama Kazoubi
  */
 class InterfaceTexteTest {
 
     private DictionnaireService dictionnaire;
     private GestionnairePartie gestionnaire;
+    private InterfaceTexte interfaceTexte;
+
+    private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
+    private final PrintStream originalOut = System.out;
 
     @BeforeEach
     void setUp() {
@@ -25,158 +33,259 @@ class InterfaceTexteTest {
         dictionnaire.ajouterMot("PYTHON");
         dictionnaire.ajouterMot("RUBY");
         gestionnaire = new GestionnairePartie(dictionnaire, 6);
+
+        System.setOut(new PrintStream(outContent));
+    }
+
+    @AfterEach
+    void restoreStreams() {
+        System.setOut(originalOut);
     }
 
     @Test
-    @DisplayName("Demarrer mode 1 joueur sans erreur")
-    void testDemarrerMode1Joueur() {
-        assertDoesNotThrow(() -> gestionnaire.demarrerPartieUnJoueur());
-        assertNotNull(gestionnaire.getPartieEnCours());
-        assertEquals(EtatPartie.EN_COURS, gestionnaire.getPartieEnCours().getEtat());
+    @DisplayName("Construction de l'interface")
+    void testConstruction() {
+        interfaceTexte = new InterfaceTexte(gestionnaire);
+        assertNotNull(interfaceTexte);
     }
 
     @Test
-    @DisplayName("Demarrer mode 2 joueurs avec mot valide")
-    void testDemarrerMode2JoueursValide() {
-        assertDoesNotThrow(() -> gestionnaire.demarrerPartieDeuxJoueurs("ORDINATEUR"));
-        assertEquals("ORDINATEUR", gestionnaire.getPartieEnCours().getMotSecret());
+    @DisplayName("Menu principal - choix quitter")
+    void testMenuQuitter() {
+        String input = "3\n";
+        System.setIn(new ByteArrayInputStream(input.getBytes()));
+
+        interfaceTexte = new InterfaceTexte(gestionnaire);
+        interfaceTexte.afficherMenuPrincipal();
+
+        String output = outContent.toString();
+        assertTrue(output.contains("JEU DU PENDU") || output.contains("MENU"));
     }
 
     @Test
-    @DisplayName("Mot vide doit lever exception")
-    void testMotVide() {
-        assertThrows(IllegalArgumentException.class,
-                () -> gestionnaire.demarrerPartieDeuxJoueurs(""));
+    @DisplayName("Menu principal - choix invalide puis quitter")
+    void testMenuChoixInvalide() {
+        String input = "5\n3\n";
+        System.setIn(new ByteArrayInputStream(input.getBytes()));
+
+        interfaceTexte = new InterfaceTexte(gestionnaire);
+        interfaceTexte.afficherMenuPrincipal();
+
+        String output = outContent.toString();
+        assertTrue(output.contains("invalide"));
     }
 
     @Test
-    @DisplayName("Mot null doit lever exception")
-    void testMotNull() {
-        assertThrows(IllegalArgumentException.class,
-                () -> gestionnaire.demarrerPartieDeuxJoueurs(null));
+    @DisplayName("Mode 2 joueurs - mot vide")
+    void testMode2JoueursMotVide() {
+        String input = "2\n\n3\n";
+        System.setIn(new ByteArrayInputStream(input.getBytes()));
+
+        interfaceTexte = new InterfaceTexte(gestionnaire);
+        interfaceTexte.afficherMenuPrincipal();
+
+        String output = outContent.toString();
+        assertTrue(output.contains("vide"));
     }
 
     @Test
-    @DisplayName("Proposer lettre valide")
-    void testProposerLettreValide() {
-        gestionnaire.demarrerPartieDeuxJoueurs("JAVA");
-        assertDoesNotThrow(() -> gestionnaire.proposerLettre('J'));
+    @DisplayName("Mode 2 joueurs - victoire simple")
+    void testMode2JoueursVictoire() {
+        // Mot JAVA: J, A, V suffisent pour gagner
+        String input = "2\nJAVA\nJ\nA\nV\n3\n";
+        System.setIn(new ByteArrayInputStream(input.getBytes()));
+
+        interfaceTexte = new InterfaceTexte(gestionnaire);
+        interfaceTexte.afficherMenuPrincipal();
+
+        String output = outContent.toString();
+        assertTrue(output.contains("LICITATIONS") || output.contains("gagne"));
     }
 
     @Test
-    @DisplayName("Proposer caractere non alphabetique doit lever exception")
-    void testProposerCaractereInvalide() {
-        gestionnaire.demarrerPartieDeuxJoueurs("JAVA");
-        assertThrows(IllegalArgumentException.class,
-                () -> gestionnaire.proposerLettre('1'));
-        assertThrows(IllegalArgumentException.class,
-                () -> gestionnaire.proposerLettre('!'));
-        assertThrows(IllegalArgumentException.class,
-                () -> gestionnaire.proposerLettre(' '));
+    @DisplayName("Mode 2 joueurs - defaite complete")
+    void testMode2JoueursDefaite() {
+        // 6 erreurs pour perdre
+        String input = "2\nJAVA\nZ\nX\nW\nQ\nB\nC\n3\n";
+        System.setIn(new ByteArrayInputStream(input.getBytes()));
+
+        interfaceTexte = new InterfaceTexte(gestionnaire);
+        interfaceTexte.afficherMenuPrincipal();
+
+        String output = outContent.toString();
+        assertTrue(output.contains("PERDU"));
+    }
+
+
+    @Test
+    @DisplayName("Saisie multiple caracteres")
+    void testSaisieMultipleCaracteres() {
+        // ABC puis vraies lettres
+        String input = "2\nJAVA\nABC\nJ\nA\nV\n3\n";
+        System.setIn(new ByteArrayInputStream(input.getBytes()));
+
+        interfaceTexte = new InterfaceTexte(gestionnaire);
+        interfaceTexte.afficherMenuPrincipal();
+
+        String output = outContent.toString();
+        assertTrue(output.contains("seule"));
     }
 
     @Test
-    @DisplayName("Lettre deja proposee ne compte pas comme erreur")
-    void testLettreDejaProposee() {
-        gestionnaire.demarrerPartieDeuxJoueurs("JAVA");
+    @DisplayName("Caractere invalide")
+    void testCaractereInvalide() {
+        // Chiffre puis vraies lettres
+        String input = "2\nJAVA\n1\nJ\nA\nV\n3\n";
+        System.setIn(new ByteArrayInputStream(input.getBytes()));
 
-        gestionnaire.proposerLettre('Z'); // Erreur
-        int erreurs1 = gestionnaire.getPartieEnCours().getNombreErreurs();
+        interfaceTexte = new InterfaceTexte(gestionnaire);
+        interfaceTexte.afficherMenuPrincipal();
 
-        gestionnaire.proposerLettre('Z'); // Meme lettre
-        int erreurs2 = gestionnaire.getPartieEnCours().getNombreErreurs();
-
-        assertEquals(erreurs1, erreurs2); // Pas d'erreur supplementaire
+        String output = outContent.toString();
+        assertTrue(output.contains("lettres") || output.contains("alphabet"));
     }
 
     @Test
-    @DisplayName("Victoire quand mot complete")
-    void testVictoire() {
-        gestionnaire.demarrerPartieDeuxJoueurs("JAVA");
+    @DisplayName("Affichage etat partie")
+    void testAffichageEtatPartie() {
+        String input = "2\nJAVA\nJ\nA\nV\n3\n";
+        System.setIn(new ByteArrayInputStream(input.getBytes()));
 
-        gestionnaire.proposerLettre('J');
-        gestionnaire.proposerLettre('A');
-        gestionnaire.proposerLettre('V');
+        interfaceTexte = new InterfaceTexte(gestionnaire);
+        interfaceTexte.afficherMenuPrincipal();
 
-        assertEquals(EtatPartie.GAGNEE, gestionnaire.getPartieEnCours().getEtat());
+        String output = outContent.toString();
+        assertTrue(output.contains("Mot :"));
+        assertTrue(output.contains("Erreurs :"));
     }
 
     @Test
-    @DisplayName("Defaite quand erreurs max atteintes")
-    void testDefaite() {
-        gestionnaire.demarrerPartieDeuxJoueurs("JAVA");
+    @DisplayName("Affichage lettres proposees")
+    void testAffichageLettresProposees() {
+        // Propose J et Z
+        String input = "2\nJAVA\nJ\nZ\nA\nV\n3\n";
+        System.setIn(new ByteArrayInputStream(input.getBytes()));
 
-        gestionnaire.proposerLettre('Z');
-        gestionnaire.proposerLettre('X');
-        gestionnaire.proposerLettre('W');
-        gestionnaire.proposerLettre('Q');
-        gestionnaire.proposerLettre('B');
-        gestionnaire.proposerLettre('C');
+        interfaceTexte = new InterfaceTexte(gestionnaire);
+        interfaceTexte.afficherMenuPrincipal();
 
-        assertEquals(EtatPartie.PERDUE, gestionnaire.getPartieEnCours().getEtat());
+        String output = outContent.toString();
+        assertTrue(output.contains("Lettres") || output.contains("propose"));
     }
 
     @Test
-    @DisplayName("Impossible de jouer apres partie terminee")
-    void testJouerApresTerminee() {
-        gestionnaire.demarrerPartieDeuxJoueurs("JAVA");
+    @DisplayName("Lettre presente - message positif")
+    void testLettrePresente() {
+        String input = "2\nJAVA\nJ\nA\nV\n3\n";
+        System.setIn(new ByteArrayInputStream(input.getBytes()));
 
-        // Terminer la partie
-        gestionnaire.proposerLettre('J');
-        gestionnaire.proposerLettre('A');
-        gestionnaire.proposerLettre('V');
+        interfaceTexte = new InterfaceTexte(gestionnaire);
+        interfaceTexte.afficherMenuPrincipal();
 
-        // Essayer de jouer
-        assertThrows(IllegalStateException.class,
-                () -> gestionnaire.proposerLettre('E'));
+        String output = outContent.toString();
+        assertTrue(output.contains("Bien") || output.contains("presente"));
     }
 
     @Test
-    @DisplayName("Mode 1 joueur avec dictionnaire vide doit lever exception")
+    @DisplayName("Lettre absente - message negatif")
+    void testLettreAbsente() {
+        String input = "2\nJAVA\nZ\nJ\nA\nV\n3\n";
+        System.setIn(new ByteArrayInputStream(input.getBytes()));
+
+        interfaceTexte = new InterfaceTexte(gestionnaire);
+        interfaceTexte.afficherMenuPrincipal();
+
+        String output = outContent.toString();
+        assertTrue(output.contains("Dommage") || output.contains("pas"));
+    }
+
+    @Test
+    @DisplayName("Affichage pendu ASCII")
+    void testAffichagePendu() {
+        String input = "2\nJAVA\nZ\nJ\nA\nV\n3\n";
+        System.setIn(new ByteArrayInputStream(input.getBytes()));
+
+        interfaceTexte = new InterfaceTexte(gestionnaire);
+        interfaceTexte.afficherMenuPrincipal();
+
+        String output = outContent.toString();
+        assertTrue(output.contains("+---+") || output.contains("==="));
+    }
+
+    @Test
+    @DisplayName("Message victoire contient mot")
+    void testMessageVictoireMot() {
+        String input = "2\nJAVA\nJ\nA\nV\n3\n";
+        System.setIn(new ByteArrayInputStream(input.getBytes()));
+
+        interfaceTexte = new InterfaceTexte(gestionnaire);
+        interfaceTexte.afficherMenuPrincipal();
+
+        String output = outContent.toString();
+        assertTrue(output.contains("JAVA"));
+    }
+
+    @Test
+    @DisplayName("Message defaite contient mot")
+    void testMessageDefaiteMot() {
+        String input = "2\nJAVA\nZ\nX\nW\nQ\nB\nC\n3\n";
+        System.setIn(new ByteArrayInputStream(input.getBytes()));
+
+        interfaceTexte = new InterfaceTexte(gestionnaire);
+        interfaceTexte.afficherMenuPrincipal();
+
+        String output = outContent.toString();
+        assertTrue(output.contains("JAVA"));
+    }
+
+    @Test
+    @DisplayName("Fermeture scanner")
+    void testFermerScanner() {
+        interfaceTexte = new InterfaceTexte(gestionnaire);
+        assertDoesNotThrow(() -> interfaceTexte.fermer());
+    }
+
+    @Test
+    @DisplayName("Mode 1 joueur avec dictionnaire vide")
     void testMode1JoueurDictionnaireVide() {
         DictionnaireService dictoVide = new DictionnaireService();
         GestionnairePartie gest = new GestionnairePartie(dictoVide, 6);
 
-        assertThrows(IllegalStateException.class, gest::demarrerPartieUnJoueur);
+        String input = "1\n3\n";
+        System.setIn(new ByteArrayInputStream(input.getBytes()));
+
+        InterfaceTexte inter = new InterfaceTexte(gest);
+        inter.afficherMenuPrincipal();
+
+        String output = outContent.toString();
+        assertTrue(output.contains("Erreur") || output.contains("vide"));
     }
 
     @Test
-    @DisplayName("Insensibilite a la casse")
-    void testInsensibiliteCasse() {
-        gestionnaire.demarrerPartieDeuxJoueurs("JAVA");
+    @DisplayName("Menu affiche toutes options")
+    void testMenuOptions() {
+        String input = "3\n";
+        System.setIn(new ByteArrayInputStream(input.getBytes()));
 
-        assertTrue(gestionnaire.proposerLettre('j')); // minuscule
-        assertTrue(gestionnaire.proposerLettre('A')); // majuscule
+        interfaceTexte = new InterfaceTexte(gestionnaire);
+        interfaceTexte.afficherMenuPrincipal();
+
+        String output = outContent.toString();
+        assertTrue(output.contains("1."));
+        assertTrue(output.contains("2."));
+        assertTrue(output.contains("3."));
     }
 
     @Test
-    @DisplayName("Gestion des lettres repetees dans le mot")
-    void testLettresRepetees() {
-        gestionnaire.demarrerPartieDeuxJoueurs("PROGRAMMATION");
+    @DisplayName("Mode 2 joueurs enregistre mot")
+    void testMode2JoueursEnregistreMot() {
+        String input = "2\nORDINATEUR\nO\nR\nD\nI\nN\nA\nT\nE\nU\n3\n";
+        System.setIn(new ByteArrayInputStream(input.getBytes()));
 
-        gestionnaire.proposerLettre('R');
+        interfaceTexte = new InterfaceTexte(gestionnaire);
+        interfaceTexte.afficherMenuPrincipal();
 
-        String motAffiche = gestionnaire.getPartieEnCours().getMotAffiche();
-
-        // Les deux R doivent etre reveles
-        int countR = 0;
-        for (char c : motAffiche.toCharArray()) {
-            if (c == 'R') countR++;
-        }
-        assertEquals(2, countR);
-    }
-
-    @Test
-    @DisplayName("Nombre d'erreurs incremente correctement")
-    void testIncrementErreurs() {
-        gestionnaire.demarrerPartieDeuxJoueurs("JAVA");
-
-        assertEquals(0, gestionnaire.getPartieEnCours().getNombreErreurs());
-
-        gestionnaire.proposerLettre('Z'); // Erreur 1
-        assertEquals(1, gestionnaire.getPartieEnCours().getNombreErreurs());
-
-        gestionnaire.proposerLettre('X'); // Erreur 2
-        assertEquals(2, gestionnaire.getPartieEnCours().getNombreErreurs());
+        String output = outContent.toString();
+        assertTrue(output.contains("ORDINATEUR") || output.contains("LICITATIONS"));
     }
 }
