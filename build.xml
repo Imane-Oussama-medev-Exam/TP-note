@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="tp-note" default="all" basedir=".">
+
+    <description>
+        TP Noté MEDEV
+        Build file pour automatisation avec Ant
+        Auteurs: Oussama Kazoubi, Imane Laasri
+    </description>
+
+
+
+    <!-- ========== PROPRIÉTÉS ========== -->
+    <property name="src.dir" location="src/main/java"/>
+    <property name="test.src.dir" location="src/test/java"/>
+    <property name="build.dir" location="build"/>
+    <property name="classes.dir" location="${build.dir}/classes"/>
+    <property name="test.classes.dir" location="${build.dir}/test-classes"/>
+    <property name="jar.dir" location="${build.dir}/jar"/>
+    <property name="javadoc.dir" location="${build.dir}/javadoc"/>
+    <property name="lib.dir" location="lib"/>
+    <property name="reports.dir" location="${build.dir}/test-reports"/>
+
+    <property name="jar.name" value="tp-note.jar"/>
+    <property name="main.class" value="fr.ecn.medev.Main"/>
+
+    <!-- ========== CLASSPATH ========== -->
+    <path id="classpath.compile">
+        <fileset dir="${user.home}/.m2/repository/org/junit/jupiter/junit-jupiter-api/5.10.1">
+            <include name="**/*.jar"/>
+        </fileset>
+    </path>
+
+    <path id="classpath.test">
+        <path refid="classpath.compile"/>
+        <pathelement location="${classes.dir}"/>
+        <fileset dir="${user.home}/.m2/repository/org/junit/jupiter">
+            <include name="**/*.jar"/>
+        </fileset>
+        <fileset dir="${user.home}/.m2/repository/org/junit/platform">
+            <include name="**/*.jar"/>
+        </fileset>
+        <fileset dir="${user.home}/.m2/repository/org/opentest4j">
+            <include name="**/*.jar"/>
+        </fileset>
+        <fileset dir="${user.home}/.m2/repository/org/apiguardian">
+            <include name="**/*.jar"/>
+        </fileset>
+    </path>
+
+    <!-- ========== CIBLES ========== -->
+
+    <target name="clean" description="Nettoie les fichiers générés">
+        <delete dir="${build.dir}"/>
+        <echo message="Nettoyage effectué"/>
+    </target>
+
+    <target name="init" description="Crée les répertoires nécessaires">
+        <mkdir dir="${classes.dir}"/>
+        <mkdir dir="${test.classes.dir}"/>
+        <mkdir dir="${jar.dir}"/>
+        <mkdir dir="${javadoc.dir}"/>
+        <mkdir dir="${reports.dir}"/>
+        <echo message="Répertoires créés"/>
+    </target>
+
+    <target name="compile" depends="init" description="Compile le code source">
+        <echo message="Compilation du code source..."/>
+        <javac srcdir="${src.dir}"
+               destdir="${classes.dir}"
+               includeantruntime="false"
+               source="17"
+               target="17"
+               encoding="UTF-8">
+            <classpath refid="classpath.compile"/>
+        </javac>
+        <echo message="Compilation terminée"/>
+    </target>
+
+    <target name="compile-tests" depends="compile" description="Compile les tests">
+        <echo message="Compilation des tests..."/>
+        <javac srcdir="${test.src.dir}"
+               destdir="${test.classes.dir}"
+               includeantruntime="false"
+               source="17"
+               target="17"
+               encoding="UTF-8">
+            <classpath refid="classpath.test"/>
+        </javac>
+        <echo message="Compilation des tests terminée"/>
+    </target>
+
+    <target name="test" depends="compile-tests" description="Exécute les tests JUnit 5">
+        <echo message="Exécution des tests..."/>
+        <junitlauncher printsummary="true" failureproperty="tests.failed">
+            <classpath>
+                <pathelement location="${classes.dir}"/>
+                <pathelement location="${test.classes.dir}"/>
+                <path refid="classpath.test"/>
+            </classpath>
+
+            <testclasses outputdir="${reports.dir}">
+                <fileset dir="${test.classes.dir}">
+                    <include name="**/*Test.class"/>
+                </fileset>
+                <listener type="legacy-plain" sendSysOut="true"/>
+            </testclasses>
+        </junitlauncher>
+
+        <fail if="tests.failed" message="Des tests ont échoué!"/>
+        <echo message="Tous les tests sont passés avec succès!"/>
+    </target>
+
+    <target name="jar" depends="compile" description="Crée le fichier JAR exécutable">
+        <echo message="Création du JAR..."/>
+        <jar destfile="${jar.dir}/${jar.name}" basedir="${classes.dir}">
+            <manifest>
+                <attribute name="Main-Class" value="${main.class}"/>
+                <attribute name="Implementation-Title" value="Système de Bibliothèque"/>
+                <attribute name="Implementation-Version" value="1.0-SNAPSHOT"/>
+                <attribute name="Implementation-Vendor" value="Oussama Kazoubi, Imane Laasri"/>
+            </manifest>
+        </jar>
+        <echo message="JAR créé: ${jar.dir}/${jar.name}"/>
+    </target>
+
+    <target name="javadoc" depends="init" description="Génère la documentation Javadoc">
+        <echo message="Génération de la Javadoc..."/>
+        <javadoc destdir="${javadoc.dir}"
+                 author="true"
+                 version="true"
+                 use="true"
+                 windowtitle="Système de Bibliothèque - Documentation"
+                 encoding="UTF-8"
+                 charset="UTF-8"
+                 docencoding="UTF-8"
+                 source="17">
+            <fileset dir="${src.dir}">
+                <include name="**/*.java"/>
+            </fileset>
+            <doctitle><![CDATA[<h1>Système de Gestion de Bibliothèque</h1>]]></doctitle>
+            <bottom><![CDATA[<i>Copyright &#169; 2025 Oussama Kazoubi, Imane Laasri. Tous droits réservés.</i>]]></bottom>
+            <classpath refid="classpath.compile"/>
+        </javadoc>
+        <echo message="Javadoc générée dans: ${javadoc.dir}"/>
+    </target>
+
+    <target name="run" depends="jar" description="Exécute l'application">
+        <echo message="Lancement de l'application..."/>
+        <java jar="${jar.dir}/${jar.name}" fork="true"/>
+    </target>
+
+    <target name="all" depends="clean, compile, test, jar, javadoc"
+            description="Build complet: nettoyage, compilation, tests, JAR et Javadoc">
+        <echo message="========================================"/>
+        <echo message="Build complet terminé avec succès!"/>
+        <echo message="JAR: ${jar.dir}/${jar.name}"/>
+        <echo message="Javadoc: ${javadoc.dir}/index.html"/>
+        <echo message="========================================"/>
+    </target>
+
+</project>
